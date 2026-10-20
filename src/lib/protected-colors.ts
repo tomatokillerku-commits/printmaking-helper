@@ -53,24 +53,38 @@ export function separateNaturalColors(
     for (let i = 0; i < size; i++) if (groups[i] === group) groups[i] = 0;
     samples[0].push(...samples[group]); groupPixels[0] += groupPixels[group]; samples[group] = []; groupPixels[group] = 0;
   }
+  // Ink budget. Every group with real area gets one plate first; the remaining plates
+  // go to the group whose inks are carrying the most pixels, so a split happens where
+  // the print needs it. A group that is almost empty (plain paper background, a sliver
+  // of sky) never reserves an ink: that plate would arrive blank, and a blank plate
+  // cannot be carved, registered or printed.
+  const MIN_INK_SHARE = .02;               // an ink needs 2% of the picture to be worth a plate
   const allocations = [0, 0, 0];
-  const priority = [skinPresent ? 1 : -1, clothesPresent ? 2 : -1, groupPixels[0] ? 0 : -1].filter(group => group >= 0);
+  const share = (group: number) => groupPixels[group] / size;
+  const eligible = (group: number) => groupPixels[group] > 0 && share(group) >= MIN_INK_SHARE;
+  // A group may take every remaining plate when it is the only one; with several
+  // groups, one material never takes more than half the inks (relief printing rarely
+  // needs three tones of the same material, and it fragments the face).
+  const groupCount = [0, 1, 2].filter(eligible).length;
+  const MAX_INKS_PER_GROUP = groupCount <= 1 ? count : Math.max(2, Math.ceil(count / 2));
+  const priority = [skinPresent ? 1 : -1, clothesPresent ? 2 : -1, 0].filter(group => group >= 0 && eligible(group));
   let used = 0;
   for (const group of priority) if (used < count) { allocations[group]++; used++; }
-  const extras = skinPresent || clothesPresent ? [0, 1, 2, 0, 0, 1, 2] : [0];
-  let next = 0;
-  while (used < count && priority.length) {
-    const group = extras[next++ % extras.length];
-    if (!groupPixels[group]) continue;
-    allocations[group]++; used++;
+  while (used < count) {
+    let best = -1;
+    for (let group = 0; group < 3; group++) {
+      if (!eligible(group) || allocations[group] >= MAX_INKS_PER_GROUP) continue;
+      // Pixels per existing ink: the most overloaded group earns the extra plate.
+      if (best < 0 || groupPixels[group] / allocations[group] > groupPixels[best] / allocations[best]) best = group;
+    }
+    if (best < 0) break;
+    allocations[best]++; used++;
   }
   const entries: { color: RGB; group: number; role: InkRole }[] = [];
   const roleNames: InkRole[] = ['background', 'skin', 'clothing'];
   for (let group = 0; group < 3; group++) if (allocations[group]) {
-    const input = samples[group].length ? samples[group] : [[255, 255, 255] as RGB];
-    for (const color of cluster(input, allocations[group])) entries.push({ color, group, role: roleNames[group] });
+    for (const color of cluster(samples[group], allocations[group])) entries.push({ color, group, role: roleNames[group] });
   }
-  while (entries.length < count) entries.push({ color: [255, 255, 255], group: -1, role: 'background' });
   entries.sort((a, b) => (.299 * b.color[0] + .587 * b.color[1] + .114 * b.color[2]) - (.299 * a.color[0] + .587 * a.color[1] + .114 * a.color[2]));
   const paletteLab = entries.map(entry => toLab(entry.color));
   const assignments = new Int16Array(size).fill(-1);

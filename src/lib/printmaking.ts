@@ -705,17 +705,18 @@ async function buildPlates(
     counts[ni]++;
   }
 
-  const plates: Plate[] = sorted.map((orig, idx) => {
+  const candidates: Plate[] = sorted.map((orig, idx) => {
     const cov = Math.round((counts[idx] / total) * 100);
     const { score, level } = plateDifficulty(cov, style);
+    const isDark = !separateKey && idx === sorted.length - 1;
     return {
       id: idx,
-      kind: !separateKey && idx === sorted.length - 1 ? 'black' : 'color',
+      kind: isDark ? 'black' : 'color',
       role: natural?.roles[idx],
       width: imageData.width,
       height: imageData.height,
       color: toHex(boldSorted[idx]),
-      colorName: !separateKey && idx === sorted.length - 1 ? 'Black Key Plate' : natural ? `${natural.roles[idx] === 'skin' ? 'Skin' : natural.roles[idx] === 'clothing' ? 'Clothing' : 'Background'} Ink ${String(idx + 1).padStart(2, '0')}` : `Color Plate ${String(idx + 1).padStart(2, '0')}`,
+      colorName: '',
       maskDataUrl: createPlateMask(imageData, sorted, boldSorted[idx], idx, natural?.assignments),
       printOrder: idx + 1,
       coveragePercent: cov,
@@ -723,6 +724,22 @@ async function buildPlates(
       difficultyScore: score,
     };
   });
+  // An ink that covers a few hundred pixels cannot be carved or registered, and it
+  // makes the plate count a lie. Drop it (the paper carries that area) and renumber.
+  const plates = candidates.filter(plate => plate.kind === 'black' || counts[plate.id] / total >= .005);
+  plates.forEach((plate, index) => { plate.id = index; plate.printOrder = index + 1; });
+
+  // Ink names describe the role and number each role separately, so two background
+  // inks read as Background Ink 01 / 02 instead of jumping to 03 because of the skin
+  // plate. Numbering happens after the drop so the sequence never has a hole.
+  const hasPersonInks = natural ? natural.roles.some(role => role !== 'background') : false;
+  const roleCounters: Record<InkRole, number> = { background: 0, skin: 0, clothing: 0 };
+  for (const plate of plates) {
+    if (plate.kind === 'black' || !plate.role) { plate.colorName = plate.kind === 'black' ? 'Black Key Plate' : `Ink ${String(plate.printOrder).padStart(2, '0')}`; continue; }
+    roleCounters[plate.role] += 1;
+    const label = !hasPersonInks ? 'Ink' : plate.role === 'skin' ? 'Skin Ink' : plate.role === 'clothing' ? 'Clothing Ink' : 'Background Ink';
+    plate.colorName = `${label} ${String(roleCounters[plate.role]).padStart(2, '0')}`;
+  }
 
   if (separateKey) {
     const canvas = document.createElement('canvas');
@@ -740,7 +757,8 @@ async function buildPlates(
     ctx.putImageData(keyMask, 0, 0);
     const coveragePercent = Math.round(printedPixels / total * 100);
     const { score, level } = plateDifficulty(coveragePercent, style);
-    plates.push({
+    // A blank key plate is not a plate: an all-paper image has nothing to carve.
+    if (printedPixels / total >= .005) plates.push({
       id: colorPlateCount, kind: 'black', width: canvas.width, height: canvas.height,
       color: '#000000', colorName: 'Black Key Plate', maskDataUrl: canvas.toDataURL('image/png'),
       printOrder: totalPlateCount, coveragePercent, difficulty: level, difficultyScore: score,
@@ -848,6 +866,8 @@ function analyseFeasibility(
 
 export function generateGuide(style: PrintStyle, plates: Plate[]): GuideStep[] {
   const n = plates.length;
+  // Nothing was separated, so there is no printing sequence to describe.
+  if (n === 0) return [];
 
   if (style === 'woodblock') {
     return [

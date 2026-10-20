@@ -1,11 +1,12 @@
 {
-  "title": "Printmaking Studio",
-  "description": "Transform your images into printmaking styles with automated segmentation, guiding artists in creating unique prints effortlessly.",
+  "title": "Printmaking Studio · Image to Print Plates",
+  "description": "Turn a photograph into separated, printable plates: person-aware ink separation, an independent black key plate, and transparent PNG export. All processing happens in the browser.",
   "robots": {
     "index": false
   },
   "accessibility": {
     "addBypassLinks": false,
     "ignoreReducedMotion": false
-  }
+  },
+  "language": "en"
 }

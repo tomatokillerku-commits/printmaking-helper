@@ -176,17 +176,29 @@ function LandingPage({ onEnter }: { onEnter: (style: PrintStyle) => void }) {
   const activeDetails = hovered ? TECHNIQUE_DETAILS[hovered] : null;
   const activeAccent = hovered === 'screenprint' ? '#E44322' : C.brown;
 
-  const handlePointerMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!(e.target as HTMLElement).closest('[data-hover-zone="true"]')) {
-      setHovered(null);
-    }
+  // Hover is decided by where the pointer sits on the page, never by which element is
+  // underneath it. Both tools and both labels move when a side becomes active, so an
+  // element-based hover test feeds back into its own layout: the tool slides out from
+  // under the cursor, the shell reports "no zone", the tool slides back, and it twitches
+  // forever. Page coordinates cannot move, so the state settles.
+  const sideFor = (clientX: number): PrintStyle | null => {
+    const ratio = clientX / Math.max(1, window.innerWidth);
+    return ratio < 0.38 ? 'woodblock' : ratio > 0.62 ? 'screenprint' : null;
+  };
+  const handlePointerMove = (event: React.PointerEvent<HTMLDivElement>) => setHovered(sideFor(event.clientX));
+  const handleShellClick = (event: React.MouseEvent<HTMLDivElement>) => {
+    if ((event.target as HTMLElement).closest('button')) return;
+    const side = sideFor(event.clientX);
+    if (side) onEnter(side);
   };
 
   return (
     <div
       className="landing-shell h-full overflow-hidden"
-      onMouseMove={handlePointerMove}
-      style={{
+      onPointerMove={handlePointerMove}
+      onPointerLeave={() => setHovered(null)}
+      onClick={handleShellClick}
+      style={{ cursor: hovered ? 'pointer' : 'default',
         backgroundColor: '#FFFFFF',
         color: '#17100A',
         display: 'flex',
@@ -196,8 +208,6 @@ function LandingPage({ onEnter }: { onEnter: (style: PrintStyle) => void }) {
     >
       <div
         className="landing-tool landing-tool-roller"
-        data-hover-zone="true"
-        onMouseEnter={() => setHovered('woodblock')}
         style={{
         position: 'absolute',
         left: hovered === 'woodblock' ? '11vw' : '-8.5vw',
@@ -208,7 +218,7 @@ function LandingPage({ onEnter }: { onEnter: (style: PrintStyle) => void }) {
         transform: 'translateY(-50%)',
         transition: 'left 0.46s ease, top 0.46s ease, width 0.46s ease, height 0.46s ease, opacity 0.28s ease',
         opacity: hovered === 'screenprint' ? 0.06 : 1,
-        pointerEvents: 'auto',
+        pointerEvents: 'none',
         zIndex: hovered === 'woodblock' ? 3 : 1,
       }}>
         <img
@@ -227,8 +237,6 @@ function LandingPage({ onEnter }: { onEnter: (style: PrintStyle) => void }) {
 
       <div
         className="landing-tool landing-tool-squeegee"
-        data-hover-zone="true"
-        onMouseEnter={() => setHovered('screenprint')}
         style={{
         position: 'absolute',
         right: hovered === 'screenprint' ? '50%' : '-19vw',
@@ -239,7 +247,7 @@ function LandingPage({ onEnter }: { onEnter: (style: PrintStyle) => void }) {
         transform: hovered === 'screenprint' ? 'translate(50%, -50%)' : 'translateY(-50%)',
         transition: 'right 0.46s ease, width 0.46s ease, height 0.46s ease, opacity 0.28s ease',
         opacity: hovered === 'woodblock' ? 0.06 : 1,
-        pointerEvents: 'auto',
+        pointerEvents: 'none',
         zIndex: hovered === 'screenprint' ? 3 : 1,
       }}>
         <img
@@ -259,8 +267,6 @@ function LandingPage({ onEnter }: { onEnter: (style: PrintStyle) => void }) {
       {activeStyle && activeDetails && (
         <div
           className={`landing-active-copy landing-active-copy-${activeStyle.id}`}
-          data-hover-zone="true"
-          onMouseEnter={() => setHovered(activeStyle.id)}
           style={{
             position: 'absolute',
             left: activeStyle.id === 'woodblock' ? '47vw' : '50%',
@@ -269,6 +275,7 @@ function LandingPage({ onEnter }: { onEnter: (style: PrintStyle) => void }) {
             height: activeStyle.id === 'screenprint' ? '86vh' : 'auto',
             transform: activeStyle.id === 'screenprint' ? 'translateX(-50%)' : 'none',
             zIndex: 4,
+            pointerEvents: 'none',
             textAlign: activeStyle.id === 'woodblock' ? 'left' : 'center',
             transition: 'opacity 0.28s ease, transform 0.28s ease',
           }}
@@ -328,7 +335,7 @@ function LandingPage({ onEnter }: { onEnter: (style: PrintStyle) => void }) {
         transition: 'opacity 0.24s ease',
         animation: hovered ? 'none' : 'fade-up 0.8s ease forwards',
       }}>
-        <p className="font-mono tracking-[0.22em]" style={{ fontSize: 10, color: '#8D7A61', marginBottom: 18, textAlign: 'center' }}>
+        <p className="font-mono tracking-[0.22em]" style={{ fontSize: 10, color: '#7C6A52', marginBottom: 18, textAlign: 'center' }}>
           PRINTMAKING STUDIO
           <span style={{ color: C.brick, margin: '0 10px' }}>·</span>
           IMAGE TO PRINT PLATES
@@ -363,13 +370,19 @@ function LandingPage({ onEnter }: { onEnter: (style: PrintStyle) => void }) {
         }}>
           Upload an image, generate separated color plates, and follow a practical printing guide.
         </p>
+
+        <p className="font-mono" style={{
+          fontSize: 10, letterSpacing: '0.18em', color: '#7C6A52', marginTop: 26, textAlign: 'center',
+          opacity: hovered ? 0 : 1, transition: 'opacity 0.2s ease',
+        }}>
+          PICK A SIDE TO START <span style={{ color: C.brick }}>·</span> WOODBLOCK LEFT · SCREENPRINT RIGHT
+        </p>
       </div>
 
       <button
         type="button"
         className="landing-entry-label landing-entry-woodblock"
-        data-hover-zone="true"
-        onMouseEnter={() => setHovered('woodblock')}
+        onFocus={() => setHovered('woodblock')}
         onClick={() => onEnter('woodblock')}
         style={{
           position: 'absolute',
@@ -390,13 +403,13 @@ function LandingPage({ onEnter }: { onEnter: (style: PrintStyle) => void }) {
         }}
       >
         WOODBLOCK<br />RELIEF
+        <span className="landing-entry-cta">ENTER WOODBLOCK <span aria-hidden="true">→</span></span>
       </button>
 
       <button
         type="button"
         className="landing-entry-label landing-entry-screenprint"
-        data-hover-zone="true"
-        onMouseEnter={() => setHovered('screenprint')}
+        onFocus={() => setHovered('screenprint')}
         onClick={() => onEnter('screenprint')}
         style={{
           position: 'absolute',
@@ -418,6 +431,7 @@ function LandingPage({ onEnter }: { onEnter: (style: PrintStyle) => void }) {
         }}
       >
         SCREENPRINT
+        <span className="landing-entry-cta">ENTER SCREENPRINT <span aria-hidden="true">→</span></span>
       </button>
     </div>
   );
@@ -664,10 +678,42 @@ export default function App() {
     const exportPlates = plates.filter(p => p.maskDataUrl);
     if (exportPlates.length === 0) return;
 
-    const files = exportPlates.map(p => ({
-      name: p.kind === 'black' ? `${String(p.printOrder).padStart(2, '0')}-black-key-plate.png` : `${String(p.printOrder).padStart(2, '0')}-${sanitizeFilename(p.colorName)}-${p.color.replace('#', '')}.png`,
-      bytes: dataUrlToBytes(p.maskDataUrl),
+    const entries = exportPlates.map(p => ({
+      plate: p,
+      name: p.kind === 'black'
+        ? `${String(p.printOrder).padStart(2, '0')}-${style === 'screenprint' ? 'darkest-ink' : 'black-key-plate'}.png`
+        : `${String(p.printOrder).padStart(2, '0')}-${sanitizeFilename(p.colorName)}-${p.color.replace('#', '')}.png`,
     }));
+
+    // A separation without its settings is not reproducible: the manifest records what
+    // produced these files, so a print can be repeated and a reviewer can check it.
+    const manifest = {
+      tool: 'Printmaking Studio',
+      technique: style,
+      generatedAt: new Date().toISOString(),
+      platesRequested: colorCount,
+      platesExported: entries.length,
+      cutLevel: style === 'woodblock' ? difficultyMode : null,
+      blackPlateStyle: style === 'woodblock' ? blackStyle : null,
+      personColorProtection: style === 'woodblock' ? protectPeople : null,
+      subjectRecognition: style === 'woodblock' ? subjectStatus : null,
+      separationMaxSidePx: Math.max(...entries.map(entry => Math.max(entry.plate.width, entry.plate.height))),
+      inks: entries.map(entry => ({
+        file: entry.name,
+        printOrder: entry.plate.printOrder,
+        kind: entry.plate.kind,
+        role: entry.plate.role ?? null,
+        colour: entry.plate.color,
+        coveragePercent: entry.plate.coveragePercent,
+        sizePx: `${entry.plate.width}x${entry.plate.height}`,
+      })),
+      note: 'Preview-resolution separation (max side 640 px). Scale up before production printing.',
+    };
+
+    const files = [
+      ...entries.map(entry => ({ name: entry.name, bytes: dataUrlToBytes(entry.plate.maskDataUrl) })),
+      { name: 'manifest.json', bytes: new TextEncoder().encode(JSON.stringify(manifest, null, 2)) },
+    ];
     const blob = createZipBlob(files);
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -677,16 +723,17 @@ export default function App() {
     link.click();
     link.remove();
     window.setTimeout(() => URL.revokeObjectURL(url), 1000);
-  }, [plates, style]);
+  }, [plates, style, colorCount, difficultyMode, blackStyle, protectPeople, subjectStatus]);
 
   const handleSaveSinglePlate = useCallback((plate: Plate) => {
     const link = document.createElement('a');
     link.href = plate.maskDataUrl;
-    link.download = plate.kind === 'black' ? 'black-key-plate.png' : `${String(plate.printOrder).padStart(2, '0')}-${sanitizeFilename(plate.colorName)}.png`;
+    const darkName = style === 'screenprint' ? 'darkest-ink' : 'black-key-plate';
+    link.download = plate.kind === 'black' ? `${darkName}.png` : `${String(plate.printOrder).padStart(2, '0')}-${sanitizeFilename(plate.colorName)}.png`;
     document.body.appendChild(link);
     link.click();
     link.remove();
-  }, []);
+  }, [style]);
 
   const resetWorkspace = useCallback(() => {
     setProcessedImage(null);
