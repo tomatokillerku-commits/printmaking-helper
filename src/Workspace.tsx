@@ -64,11 +64,16 @@ export default function Workspace(props: Props) {
   const blackPlate = props.plates.find(plate => plate.kind === 'black');
   const colorPlates = props.plates.filter(plate => plate.kind === 'color');
   const hasSkinAndClothing = colorPlates.some(plate => plate.role === 'skin') && colorPlates.some(plate => plate.role === 'clothing');
+  // With a background ink, paper only shows through the gaps; the old caption then lied.
+  const hasBackgroundInk = colorPlates.some(plate => plate.role === 'background');
   const selected = props.selectedPlate;
   const currentImage = selected?.maskDataUrl ?? (props.primaryView === 'original' ? props.sourceImage : props.effectImage || props.sourceImage);
   const activeCount = props.plates.filter(plate => props.visiblePlateIds.has(plate.id)).length;
   const chooseFile = () => fileInput.current?.click();
-  const displayName = selected?.kind === 'black' ? 'Black key plate' : selected ? selected.colorName : props.primaryView === 'original' ? 'Original photograph' : 'Composite proof';
+  // Serigraphy has no key plate: the darkest ink is simply the last flat colour printed.
+  const darkName = props.style === 'screenprint' ? 'Darkest ink' : 'Black key plate';
+  const darkHint = props.style === 'screenprint' ? 'Flat ink on transparency. Printed last.' : 'Carved marks on transparency. Printed last.';
+  const displayName = selected?.kind === 'black' ? darkName : selected ? selected.colorName : props.primaryView === 'original' ? 'Original photograph' : 'Composite proof';
   const draftValid = /^#[0-9a-f]{3}(?:[0-9a-f]{3})?$/i.test(props.colorDraft);
   const rootStyle = { '--studio-accent': props.style === 'woodblock' ? '#AA453B' : '#E44322' } as CSSProperties;
 
@@ -104,7 +109,7 @@ export default function Workspace(props: Props) {
               <div className="studio-view-switch">
                 <button aria-pressed={!selected && props.primaryView === 'processed'} onClick={() => props.onPrimaryViewChange('processed')}>Composite</button>
                 <button aria-pressed={!selected && props.primaryView === 'original'} onClick={() => props.onPrimaryViewChange('original')}>Original</button>
-                <button disabled={!blackPlate} aria-pressed={selected?.kind === 'black'} onClick={() => blackPlate && props.onSelectPlate(blackPlate.id)}>Black plate</button>
+                <button disabled={!blackPlate} aria-pressed={selected?.kind === 'black'} onClick={() => blackPlate && props.onSelectPlate(blackPlate.id)}>{darkName}</button>
               </div>
               {props.plates.length > 0 && <span className="studio-proof-count">{activeCount} / {props.plates.length} plates visible</span>}
             </div>
@@ -126,14 +131,14 @@ export default function Workspace(props: Props) {
             ) : null}
             {props.processing && <div className="studio-processing" role="status"><span className="studio-spinner" /><p>{props.style === 'woodblock' && props.protectPeople ? 'Recognizing regions & preparing plates…' : 'Preparing your printing plates…'}</p></div>}
           </div>
-          {props.sourceImage && !props.processing && <div className="studio-proof-caption"><span>{displayName}</span>{selected ? <button className="studio-text-button" onClick={() => props.onPrimaryViewChange('processed')}>Back to composite <Arrow /></button> : <span>Paper is the background, not a printing plate.</span>}</div>}
+          {props.sourceImage && !props.processing && <div className="studio-proof-caption"><span>{displayName}</span>{selected ? <button className="studio-text-button" onClick={() => props.onPrimaryViewChange('processed')}>Back to composite <Arrow /></button> : <span>{hasBackgroundInk ? 'Background inks are printed; paper shows through the gaps.' : 'Paper is the background, not a printing plate.'}</span>}</div>}
           {props.processingError && <p className="studio-error" role="alert">{props.processingError}</p>}
 
           {selected && <section className="studio-ink-editor" aria-label="Selected plate settings">
-            <div><p className="studio-eyebrow">{selected.kind === 'black' ? 'BLACK KEY PLATE' : 'CHANGE THIS INK'}</p><p>{selected.kind === 'black' ? 'Carved marks on transparency. Printed last.' : 'Change the ink while keeping this plate’s shape.'}</p></div>
+            <div><p className="studio-eyebrow">{selected.kind === 'black' ? darkName.toUpperCase() : 'CHANGE THIS INK'}</p><p>{selected.kind === 'black' ? darkHint : 'Change the ink while keeping this plate’s shape.'}</p></div>
             <div className="studio-ink-editor-controls">
               {selected.kind === 'color' && <><input type="color" value={/^#[0-9a-f]{6}$/i.test(props.colorDraft) ? props.colorDraft : selected.color} onChange={event => props.onPlateColorChange(selected, event.target.value)} aria-label="Choose plate color" /><input className="studio-hex" value={props.colorDraft} aria-label="Plate color hex value" aria-invalid={!draftValid} spellCheck={false} onChange={event => props.onPlateColorChange(selected, event.target.value)} /></>}
-              <button className="studio-button studio-button--outline" onClick={() => props.onSavePlate(selected)}>Save {selected.kind === 'black' ? 'black plate' : 'plate'} PNG <Arrow direction="down" /></button>
+              <button className="studio-button studio-button--outline" onClick={() => props.onSavePlate(selected)}>Save {selected.kind === 'black' ? `${darkName} PNG` : 'plate PNG'} <Arrow direction="down" /></button>
             </div>
           </section>}
         </section>
@@ -161,15 +166,16 @@ export default function Workspace(props: Props) {
           </div>}
           {props.sourceImage && <button className="studio-button" onClick={props.onUpdate} disabled={props.processing}>{props.processing ? 'Preparing plates…' : props.settingsDirty ? 'Apply changes' : 'Regenerate proof'}<Arrow /></button>}
           <div className="studio-setting-divider" />
-          <div className="studio-layer-heading"><h2 className="studio-eyebrow">INK SEPARATIONS</h2>{props.plates.length > 0 && <span>{colorPlates.length} COLOR + 1 BLACK</span>}</div>
-          {props.plates.length === 0 ? <div className="studio-empty-layers"><span className="studio-empty-swatch" /><span className="studio-empty-swatch" /><span className="studio-empty-swatch is-black" /><p>Your color plates and a separate black key plate will appear here.</p></div> : (
+          <div className="studio-layer-heading"><h2 className="studio-eyebrow">INK SEPARATIONS</h2>{props.plates.length > 0 && <span>{props.style === 'screenprint' ? `${props.plates.length} INKS` : `${colorPlates.length} COLOR + 1 BLACK`}</span>}</div>
+          {props.plates.length > 0 && props.plates.length !== props.totalPlates && <p className="studio-setting-note is-plate-shortfall">{props.totalPlates} plates requested · {props.plates.length} have printable area. An ink with almost no area was dropped instead of printing a blank plate; the paper carries that area.</p>}
+          {props.plates.length === 0 ? <div className="studio-empty-layers"><span className="studio-empty-swatch" /><span className="studio-empty-swatch" /><span className="studio-empty-swatch is-black" /><p>{props.sourceImage && !props.processing ? 'Nothing separable in this image: it has too little tonal range to divide into inks. Try a photograph with more contrast.' : 'Your color plates and a separate black key plate will appear here.'}</p></div> : (
             <div className="studio-layers">{[...props.plates].reverse().map(plate => {
               const visible = props.visiblePlateIds.has(plate.id);
               const isSelected = selected?.id === plate.id;
               return <div key={plate.id} className={`studio-layer ${isSelected ? 'is-selected' : ''} ${props.dragOverId === plate.id && plate.kind === 'color' ? 'is-drag-over' : ''}`} data-plate-kind={plate.kind} onDragOver={event => { if (plate.kind === 'color') props.onLayerDragOver(event, plate.id); }} onDrop={event => { event.stopPropagation(); props.onLayerDrop(plate.id); }}>
-                <button className="studio-layer-thumb studio-transparency" aria-label={`View ${plate.kind === 'black' ? 'black key plate' : plate.colorName}`} aria-pressed={isSelected} onClick={() => props.onSelectPlate(isSelected ? null : plate.id)}><img src={plate.maskDataUrl} alt="" /></button>
-                <div className="studio-layer-info"><button className="studio-layer-name" onClick={() => props.onSelectPlate(isSelected ? null : plate.id)}>{plate.kind === 'black' ? 'Black key plate' : plate.colorName.replace(' Plate', '')}</button><span className="studio-layer-meta"><i style={{ backgroundColor: plate.color }} />{plate.kind === 'black' ? 'PRINT LAST' : plate.color.toUpperCase()} · {plate.coveragePercent}%</span></div>
-                <div className="studio-layer-actions"><label className="studio-visibility"><input type="checkbox" checked={visible} aria-label={`Show ${plate.kind === 'black' ? 'black key plate' : plate.colorName}`} onChange={() => props.onTogglePlateVisible(plate.id)} /><span className="sr-only">Show plate</span></label><button className="studio-icon-button" aria-label={`Save ${plate.kind === 'black' ? 'black key plate' : plate.colorName} PNG`} onClick={() => props.onSavePlate(plate)}><Arrow direction="down" /></button>{plate.kind === 'color' && <button className="studio-drag-handle" draggable aria-label={`Drag to reorder ${plate.colorName}`} onDragStart={() => props.onLayerDragStart(plate.id)} onDragEnd={props.onLayerDragEnd}>⠿</button>}</div>
+                <button className="studio-layer-thumb studio-transparency" aria-label={`View ${plate.kind === 'black' ? darkName : plate.colorName}`} aria-pressed={isSelected} onClick={() => props.onSelectPlate(isSelected ? null : plate.id)}><img src={plate.maskDataUrl} alt="" /></button>
+                <div className="studio-layer-info"><button className="studio-layer-name" onClick={() => props.onSelectPlate(isSelected ? null : plate.id)}>{plate.kind === 'black' ? darkName : plate.colorName.replace(' Plate', '')}</button><span className="studio-layer-meta"><i style={{ backgroundColor: plate.color }} />{plate.kind === 'black' ? 'PRINT LAST' : plate.color.toUpperCase()} · {plate.coveragePercent}%</span></div>
+                <div className="studio-layer-actions"><label className="studio-visibility"><input type="checkbox" checked={visible} aria-label={`Show ${plate.kind === 'black' ? darkName : plate.colorName}`} onChange={() => props.onTogglePlateVisible(plate.id)} /><span className="sr-only">Show plate</span></label><button className="studio-icon-button" aria-label={`Save ${plate.kind === 'black' ? darkName : plate.colorName} PNG`} onClick={() => props.onSavePlate(plate)}><Arrow direction="down" /></button>{plate.kind === 'color' && <button className="studio-drag-handle" draggable aria-label={`Drag to reorder ${plate.colorName}`} onDragStart={() => props.onLayerDragStart(plate.id)} onDragEnd={props.onLayerDragEnd}>⠿</button>}</div>
               </div>;
             })}</div>
           )}
