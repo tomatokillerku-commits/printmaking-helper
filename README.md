@@ -1,2 +1,73 @@
-# printmaking-helper
-Photo-to-woodcut printmaking studio with independent black and color plates, automatic person color protection, and manual region editing.
+# Printmaking Studio · 版画分版助手
+
+把照片转成木刻版画预览，分别生成彩色版与独立黑色刀痕版。用户可以选择版数、调整油墨颜色、修正人物区域，并下载透明 PNG 分版。
+
+## 已实现
+
+- 木刻黑版两种表现：A 块面概括、B 粗刀刻痕，可调刀痕程度。
+- 彩版与黑版独立生成；黑版始终叠在最上面，并可单独查看、显隐、下载。
+- 总版数可选 3–9，默认 5；黑色计入一版，纸张底色不计版。
+- 自动识别皮肤、衣服、头发与背景，优先保留人物颜色，减少大片背景挤占肤色的问题。
+- 区域画笔可以修正自动识别：皮肤、衣服、头发、背景／物体四类，支持画笔大小、撤销、取消、应用与恢复自动识别。
+- 彩版独立换色、显隐与调整顺序；单版 PNG 或全部分版 ZIP 导出。
+- 首页、木刻工作台与印刷步骤说明；另保留丝网模式入口。
+
+人物识别使用现成的 MediaPipe 分割模型（把照片划分为不同区域的模型）；刀痕、选色、分色与叠加由代码计算，不使用生成式图片服务。用户照片在浏览器本地处理。
+
+## 启动
+
+需要 Node.js 22 和 pnpm 10。pnpm 是用于安装项目依赖与运行项目的工具。
+
+```sh
+pnpm install --frozen-lockfile
+pnpm dev
+```
+
+默认打开 http://127.0.0.1:8443/ 。也可以用 `pnpm dev --port 5173` 指定其他端口。
+
+```sh
+pnpm typecheck
+pnpm build
+pnpm preview
+```
+
+`pnpm build` 生成 `dist/`。请通过开发服务器或静态网站服务器访问，直接双击 HTML 文件无法完整加载人物识别运行文件。
+
+## 主要文件
+
+| 文件 | 用途 |
+| --- | --- |
+| `src/App.tsx` | 首页、状态与处理流程、分版导出 |
+| `src/Workspace.tsx` | 分版工作台 |
+| `src/RegionEditor.tsx` | 人物区域画笔修正 |
+| `src/lib/woodcut.ts` | 黑版块面与刀痕计算 |
+| `src/lib/subjects.ts` | 浏览器本地人物识别 |
+| `src/lib/protected-colors.ts` | 按区域分配油墨与自然选色 |
+| `src/lib/printmaking.ts` | 分版、透明图层、合成与印刷说明 |
+| `src/workspace.css` | 工作台与区域编辑界面样式 |
+| `public/vendor/mediapipe/` | 人物模型、浏览器运行库与第三方许可 |
+| `.figma/make/site.json` | 页面标题等配置，构建时需要 |
+
+## 颜色与使用限制
+
+默认 5 版在同时识别到皮肤、衣服和背景时，通常是 1 肤色 + 1 衣服色 + 2 背景色 + 1 黑色。总 3 版只有 2 个彩色名额，此时优先皮肤和衣服，背景用纸色与黑版表达；保留背景彩色建议选至少 4 版。
+
+- 枝叶遮挡、细发丝和复杂边界仍可能识别错误，可用 **Refine person regions** 修正。
+- 多个人物共用皮肤／衣服区域组，并不保证每个人各占一版。
+- 当前处理最长边为 640 像素，导出对齐的透明位图；没有雕刻机矢量路径，也没有真实油墨混色模拟。
+- 手动修正随当前照片保留，刷新或离开工作页后不保留。
+- 人物识别模型与运行库随项目分发，第一次处理会加载约 16 MB 模型和所需运行文件，耗时取决于设备。
+- 页面字体来自 Google Fonts；离线时使用备用字体。照片不会发送至字体服务。
+- 人物识别失败会显示提示，仍可手动画区域；丝网模式保留此前的全图选色流程。
+
+## 第三方组件与许可
+
+界面使用 React、Vite 与 Tailwind CSS。MediaPipe Tasks Vision 版本为 1.1.1；模型为 `selfie_multiclass_256x256/float32/1`。其 Apache-2.0 许可、来源与模型校验值保留在 `public/vendor/mediapipe/LICENSE` 和 `provenance.json`。
+
+[MediaPipe 官方模型说明](https://developers.google.com/edge/mediapipe/solutions/vision/image_segmenter)
+
+## 仓库内容
+
+该仓库保存可构建的源代码与必要模型文件。用户照片、验证截图、生成的试样、临时文件、依赖目录与打包产物均不上传。首页所需的滚筒与刮板图片保留。
+
+整理前的工作副本已通过类型检查、生产构建、独立黑版／透明合成／3、4、5、9 版检查，并在浏览器中验证了人物识别、涂刷生效、撤销、恢复自动识别与小屏布局。依赖个人照片和本机路径的临时验证脚本没有收入仓库；本仓库可直接运行的检查为 `pnpm typecheck` 和 `pnpm build`。

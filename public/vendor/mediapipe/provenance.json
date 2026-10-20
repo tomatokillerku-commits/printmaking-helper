@@ -1,0 +1,8 @@
+{
+  "library": "@mediapipe/tasks-vision",
+  "version": "1.1.1",
+  "model": "https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_multiclass_256x256/float32/1/selfie_multiclass_256x256.tflite",
+  "model_sha256": "c6748b1253a99067ef71f7e26ca71096cd449baefa8f101900ea23016507e0e0",
+  "license": "Apache-2.0",
+  "documentation": "https://developers.google.com/edge/mediapipe/solutions/vision/image_segmenter"
+}

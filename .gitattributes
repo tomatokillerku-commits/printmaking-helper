@@ -1,0 +1,7 @@
+* text=auto
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.wasm binary
+*.tflite binary
+public/vendor/** -text -whitespace linguist-vendored

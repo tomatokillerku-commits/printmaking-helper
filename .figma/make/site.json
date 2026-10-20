@@ -1,0 +1,11 @@
+{
+  "title": "Printmaking Studio",
+  "description": "Transform your images into printmaking styles with automated segmentation, guiding artists in creating unique prints effortlessly.",
+  "robots": {
+    "index": false
+  },
+  "accessibility": {
+    "addBypassLinks": false,
+    "ignoreReducedMotion": false
+  }
+}
